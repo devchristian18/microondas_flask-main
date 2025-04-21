@@ -1,0 +1,216 @@
+{% extends 'base.html' %}
+
+{% block title %}Microondas Inteligente - Inicio{% endblock %}
+
+{% block content %}
+    <div id="serial-modal" class="modal fade show" tabindex="-1" role="dialog" style="display: block;">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Activación de Dispositivo</h5>
+                </div>
+                <div class="modal-body">
+                    <p>Por favor, ingrese el serial de activación para usar su Microondas Inteligente:</p>
+                    <div class="form-group">
+                        <input type="text" class="form-control" id="serial-input" placeholder="Ingrese serial de activación">
+                    </div>
+                    <div id="serial-error" class="alert alert-danger" style="display: none;">
+                        Serial incorrecto. Por favor, intente nuevamente.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="verificarSerial()">Activar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="main-content" style="display: none;">
+        <h1>Microondas Inteligente</h1>
+        <div id="status-activacion" class="alert alert-success mb-3">
+            <strong>ACTIVADO</strong> | Serial: <span id="serial-mostrado"></span>
+          
+        </div>
+        
+        {% if request.args.get('mensaje_programacion') %}
+        <div class="alert alert-info">{{ request.args.get('mensaje_programacion') }}</div>
+        {% endif %}
+        <div class="row">
+            {% for receta in recetas %}
+            <div class="col-md-4 mb-4" id="receta-{{ receta.id }}">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ receta.nombre }}</h5>
+                        <p class="card-text">Tiempo: {{ receta.tiempo }} {{ receta.unidad_tiempo }}</p>
+                        <button class="btn btn-primary btn-sm" onclick="enviarAlHorno('{{ receta.id }}')">Enviar al Horno</button>
+                        <button class="btn btn-secondary ml-2" onclick="personalizarReceta('{{ receta.id }}')">Personalizar</button>
+                        <button class="btn btn-info ml-2" onclick="programarReceta('{{ receta.id }}')">Programar</button>
+                    </div>
+                    <div class="card-footer p-2">
+                        <div id="coccion-{{ receta.id }}" class="progress" style="display:none;">
+                            <div class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width:0%;">0%</div>
+                        </div>
+                        <div id="mensaje-final-{{ receta.id }}" class="alert alert-success mt-2" style="display:none;"></div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="modal fade" id="programarModal" tabindex="-1" role="dialog" aria-labelledby="programarModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="programarModalLabel">Programar Cocción</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>Seleccione la fecha y hora para iniciar la cocción de la receta con ID <span id="receta-id-programar"></span>:</p>
+                    <form id="programarForm" method="POST">
+                        <div class="form-group">
+                            <label for="fecha">Fecha:</label>
+                            <input type="date" class="form-control" id="fecha" name="fecha" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="hora">Hora:</label>
+                            <input type="time" class="form-control" id="hora" name="hora" required>
+                        </div>
+                        <input type="hidden" id="programar_receta_id" name="receta_id">
+                        <button type="submit" class="btn btn-primary">Guardar Programación</button>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        // Serial de activación correcto
+        const serialCorrecto = "PROFGIOVANNI2025";
+        
+        // Verificar si ya está activado
+        document.addEventListener('DOMContentLoaded', function() {
+            verificarActivacion();
+        });
+        
+        function verificarActivacion() {
+            const serialActivado = sessionStorage.getItem('microondas_activado');
+            const estadoActivacion = sessionStorage.getItem('microondas_estado');
+            
+            if (serialActivado === serialCorrecto && estadoActivacion === 'activo') {
+                mostrarContenidoPrincipal(serialActivado);
+            } else {
+                mostrarModalSerial();
+            }
+        }
+        
+        function mostrarContenidoPrincipal(serial) {
+            document.getElementById('serial-modal').style.display = 'none';
+            document.getElementById('main-content').style.display = 'block';
+            document.getElementById('serial-mostrado').textContent = serial;
+        }
+        
+        function mostrarModalSerial() {
+            document.getElementById('serial-modal').style.display = 'block';
+            document.getElementById('main-content').style.display = 'none';
+            // Limpiar el campo de entrada por seguridad
+            if (document.getElementById('serial-input')) {
+                document.getElementById('serial-input').value = '';
+            }
+        }
+        
+        function verificarSerial() {
+            const serialIngresado = document.getElementById('serial-input').value;
+            if (serialIngresado === serialCorrecto) {
+                // Serial correcto, activar y mostrar contenido
+                sessionStorage.setItem('microondas_activado', serialIngresado);
+                sessionStorage.setItem('microondas_estado', 'activo');
+                mostrarContenidoPrincipal(serialIngresado);
+            } else {
+                // Serial incorrecto, mostrar error
+                document.getElementById('serial-error').style.display = 'block';
+                setTimeout(function() {
+                    document.getElementById('serial-error').style.display = 'none';
+                }, 3000);
+            }
+        }
+        
+        function cerrarSesion() {
+            // Eliminar información de activación
+            sessionStorage.removeItem('microondas_activado');
+            sessionStorage.removeItem('microondas_estado');
+            
+            // Mostrar ventana de activación nuevamente
+            mostrarModalSerial();
+            
+            // Mensaje de confirmación
+            alert("Sesión cerrada. Por favor active el dispositivo nuevamente.");
+        }
+        
+        function enviarAlHorno(recetaId) {
+            const cardFooter = document.querySelector(`#receta-${recetaId} .card-footer`)
+            const progresoDiv = document.getElementById(`coccion-${recetaId}`);
+            const progressBar = progresoDiv.querySelector('.progress-bar');
+            const mensajeFinalDiv = document.getElementById(`mensaje-final-${recetaId}`);
+            
+            // Mostrar barra de progreso
+            progresoDiv.style.display = 'block';
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+            mensajeFinalDiv.style.display = 'none';
+            
+            // Hacer la petición al servidor
+            fetch(`/enviar_horno/${recetaId}`)
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.mensaje);
+                    
+                    const duracionTotal = data.tiempo;
+
+                    let tiempoTranscurrido = 0;
+                    const intervalo = setInterval(function() {
+                        tiempoTranscurrido += 0.1;
+                        const porcentaje = Math.min((tiempoTranscurrido / duracionTotal) * 100, 100);
+                        const porcentajeRedondeado = Math.round(porcentaje);
+                        
+                        progressBar.style.width = porcentajeRedondeado + '%';
+                        progressBar.textContent = porcentajeRedondeado + '%';
+                        
+                        if (porcentajeRedondeado >= 100) {
+                            clearInterval(intervalo);
+                            mensajeFinalDiv.textContent = data.mensaje_final;
+                            mensajeFinalDiv.className = "alert alert-success mt-2";
+                            mensajeFinalDiv.style.display = 'block';
+                            setTimeout(function() {
+                                alert(data.mensaje_final);
+                            }, 100);
+                        }
+                    }, 100);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    mensajeFinalDiv.textContent = 'Error al procesar la receta';
+                    mensajeFinalDiv.className = "alert alert-danger mt-2";
+                    mensajeFinalDiv.style.display = 'block';
+                });
+        }
+
+        function personalizarReceta(recetaId) {
+            window.location.href = `/personalizar_receta/${recetaId}`;
+        }
+
+        function programarReceta(recetaId) {
+            $('#programarModal').modal('show');
+            document.getElementById('receta-id-programar').textContent = recetaId;
+            const programarForm = document.getElementById('programarForm');
+            programarForm.action = `/guardar_programacion/${recetaId}`;
+        }
+    </script>
+{% endblock %}
